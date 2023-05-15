@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>查询</title>
+<link rel="stylesheet" type="text/css"
+	href="ui/themes/default/easyui.css">
+<link rel="stylesheet" type="text/css" href="ui/themes/icon.css">
+<script type="text/javascript" src="ui/jquery.min.js"></script>
+<script type="text/javascript" src="ui/jquery.easyui.min.js"></script>
+<script type="text/javascript" src="ui/locale/easyui-lang-zh_CN.js"></script>
+<script type="text/javascript" src="js/jquery.serializejson.min.js"></script>
+<script type="text/javascript" src="js/date.js"></script>
+<script>
+//定义ajax跳转的地方
+var appletUrl='';
+ $(function(){
+	 //自定义编号验证器
+	 $.extend($.fn.validatebox.defaults.rules, {    
+		    maxLength: {    
+		        validator: function(value, param){    
+		            return value.length <= param[0];    
+		        },    
+		        message: '最大为4个字符'   
+		    }    
+		}); 
+	 
+	//搜索框的事件
+	 $('#searchButton').click(function(){
+		 /* 将form表单映射为json格式 */
+		 var data=$('#searchForm').serializeJSON();
+		 $('#dg').datagrid('load',data);
+	 })
+	 //查询框事件
+	 $('#button').click(function(){
+		 var data2=$('#form').serializeJSON();
+		 $('#dg').datagrid('load',data2);
+	 })
+	 //创建表单弹出窗口
+	 $('#addEmp').dialog({    
+		    title: '添加员工',    
+		    width: 280,    
+		    height: 300,    
+		    closed: true,   
+		    modal: true   
+	});
+	//对弹出窗口的表单做编辑和提交的事件
+	 $('#addButton').click(function(){
+		 //表单填写如果不正确,就不会让你通过
+		 var isValid=$('#addForm').form('validate');
+		 if(!isValid){
+			 $.messager.alert('消息','表单未填写正确！','info');
+			 return;
+		 }
+		 
+		 var  data3=$('#addForm').serializeJSON();
+		 $.ajax({
+			 type:'POST',
+			 url:appletUrl+'.action',
+			 //将json数据发送给后台,这必须是json格式
+			 data:data3,
+			 //成功后获取前台数据
+			 success:function(data){
+				 $.messager.alert('消息',data.msg,'info',function(){
+	                    $('#dg').datagrid('reload');
+						$('#addform').form('clear');
+						$('#addEmp').dialog('close');
+					})
+				}
+			})
+		})
+	})
+</script>
+</head>
+<body>
+
+<form id="searchForm">
+ 员工姓名:<input type="text" name="ename"/>
+ 职位部门:<input type="text" name="job" />
+<button id="searchButton" type="button">查询</button>
+</form>
+
+<form id="form">
+查询员工号范围:<input type="text" name="start" placeholder="开始"/>-<input type="text" name="end" placeholder="结束">
+<button id="button" type="button">查询</button>
+</form>
+
+<table id="dg"></table>  
+<script type="text/javascript">
+		$('#dg').datagrid({    
+		    url:'empPage.action',    
+		    columns:[[    
+		        {field:'empno',title:'员工号',width:100}, 
+		        {field:'ename',title:'姓名',width:100}, 
+		        {field:'job',title:'职位',width:100,align:'right'} , 
+		        {field:'mgr',title:'上级编号',width:100,align:'right'} ,
+		        {field:'hiredate',title:'入职时间',width:100,align:'right',formatter:function(value){
+		        	return new Date(value).Format("yyyy-MM-dd");
+		        }} ,  
+		        {field:'sal',title:'工资',width:100,align:'right'} ,  
+		        {field:'comm',title:'奖金',width:100,align:'right'} ,  
+		        {field:'dept',title:'部门名',width:100,align:'right',formatter:function(value){/* 这个value就是field的值*/
+		        	return value.dname;
+		        }}
+		    ]],
+		    pagination:true,
+		    pageList:[5,10,15],
+		    pageSize:5,
+		    toolbar:[{
+		    	text:'编辑员工',
+				iconCls: 'icon-edit',
+				handler: function(){
+					 appletUrl='editEmp';
+					 //获取选择中的第一项
+					var emplist = $('#dg').datagrid('getSelected');
+					//alert(JSON.stringify(emplist));
+					if(emplist!=null){
+						//将表单中字符串格式的日期,改为日期类型
+						emplist.hiredate = new Date(emplist.hiredate).Format("yyyy-MM-dd");
+						$('#addForm').form('load',emplist);
+						$('#addEmp').dialog('open');
+					}
+				}
+			},'-',{
+				text:'添加员工',
+				iconCls: 'icon-add',
+				handler: function(){
+					 appletUrl='addEmp';
+					 //清除表单的内容
+					 $('#addForm').form('clear');
+					 //打开小窗口输表单
+					 $('#addEmp').dialog('open');
+				}
+			},'-',{
+				text:'删除员工',
+				iconCls: 'icon-remove',
+				handler: function(){
+					//获取全部选择的行
+					var arr=$('#dg').datagrid('getSelections');
+					
+					if(arr.length>0){
+						var arrids=new Array(arr.length);
+						for(var i=0;i<arr.length;i++){
+							arrids[i]=arr[i].empno;
+						}
+						//将数组转换为json格式的字符串
+						var json=JSON.stringify(arrids);
+						//alert(json);
+						//采用确认删除框来再次判断是否删除
+						$.messager.confirm('确认删除框', '您确认你要删除的选项吗？', function(r){
+							if (r){
+								$.ajax({
+									type:'POST',
+									url:'deleteEmp.action',
+									data:{json:json},
+									success:function(data){
+										$.messager.alert('消息',data.msg,'info',function(){
+											$('#dg').datagrid('reload');
+										})
+									}
+								})
+							}
+						});
+					}
+				}
+			}]
+
+		});
+	</script>
+
+  <div id="addEmp">
+    <form id="addForm">
+			<table>
+				<tr>
+					<td>员工号</td>
+					<td><input type="text" name="empno" class="easyui-validatebox" data-options="validType:'maxLength[4]'" /></td>
+				</tr>
+				<tr>
+					<td>员工名</td>
+					<td><input type="text" name="ename" /></td>
+				</tr>
+				<tr>
+					<td>职位</td>
+					<td><input type="text" name="job" /></td>
+				</tr>
+				<tr>
+					<td>上级编号</td>
+					<td><input type="text" name="mgr" /></td>
+				</tr>
+				<tr>
+					<td>入职时间</td>
+					<td><input type="text" name="hiredate"  class="easyui-datebox" editable="false"/></td>
+				</tr>
+				<tr>
+					<td>工资</td>
+					<td><input type="text" name="sal" /></td>
+				</tr>
+				<tr>
+					<td>奖金</td>
+					<td><input type="text" name="comm" /></td>
+				</tr>
+				<tr>
+					<td>部门名</td>
+					<td><input type="text" name="deptno" class="easyui-combobox"
+					 data-options="valueField:'deptno',textField:'dname',url:'deptList.action'" editable="false"/></td>
+				</tr>
+			</table>
+				<button id="addButton" type="button">提交</button>
+    </form>
+  </div>  
+</body>
+</html>
